@@ -1,0 +1,19 @@
+{
+  "id": "openclaw-monitor",
+  "name": "P-MATRIX OpenClaw Monitor",
+  "description": "Real-time safety monitoring — R(t) scoring, Safety Gate, Credential Protection, Kill Switch",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "serverUrl": { "type": "string" },
+      "agentId": { "type": "string" },
+      "apiKey": { "type": "string" }
+    }
+  },
+  "uiHints": {
+    "apiKey": { "label": "P-MATRIX API Key", "sensitive": true },
+    "serverUrl": { "label": "Server URL", "placeholder": "https://api.pmatrix.io" },
+    "agentId": { "label": "Agent ID", "placeholder": "oc_your_agent_id" }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "name": "@pmatrix/openclaw-monitor",
+  "version": "0.3.4",
+  "description": "Real-time safety monitoring plugin for OpenClaw agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "openclaw-monitor": "./dist/cli/setup.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "NOTICE",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "openclaw.plugin.json"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  },
+  "keywords": [
+    "openclaw",
+    "pmatrix",
+    "safety",
+    "monitoring",
+    "agent",
+    "plugin"
+  ],
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "homepage": "https://github.com/p-matrix/openclaw-monitor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/p-matrix/openclaw-monitor.git"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ]
+  }
+}
