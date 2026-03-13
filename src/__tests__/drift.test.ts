@@ -195,7 +195,7 @@ describe('applyStabilityDelta', () => {
     expect(result).not.toBeNull();
     expect(result!.stability).toBeCloseTo(0.10, 4);
     expect(state.axes.stability).toBeCloseTo(0.10, 4);
-    // R(t) = 1 - (1.0 + 1.0 + (1-0.10) + 1.0) / 4 = 1 - 3.9/4 = 0.025
+    // expected R(t) ≈ 0.025
     expect(state.currentRt).toBeCloseTo(0.025, 4);
   });
 

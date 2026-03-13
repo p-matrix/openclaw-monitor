@@ -25,8 +25,8 @@ import {
 /** 모든 활성 세션의 상태 저장소 */
 export const sessions = new Map<string, SessionState>();
 
-/** 플러그인 초기화 시 설정되는 framework_tag (기본 'beta') */
-let _frameworkTag: 'beta' | 'stable' = 'beta';
+/** 플러그인 초기화 시 설정되는 framework_tag (기본 'stable') */
+let _frameworkTag: 'beta' | 'stable' = 'stable';
 export function setFrameworkTag(tag: 'beta' | 'stable'): void { _frameworkTag = tag; }
 
 // ─── pendingChildLinks — 교차 세션 Sub-Agent 브릿지 (§A-1) ──────────────────
@@ -797,7 +797,7 @@ function matchSubsequence(window: string[], pattern: string[]): boolean {
 
 /**
  * 로컬 R(t) 계산 (Kernel 공식 근사)
- * R(t) = 1.0 - (baseline + norm + (1-stability) + meta_control) / 4.0
+ * 4축 평균 기반 위험도 산출 — 서버와 동일한 로직
  */
 export function computeLocalRt(axes: AxesState): number {
   const rt =
@@ -836,8 +836,9 @@ export function getSessionCount(): number {
 
 // ─── 내부 헬퍼 ────────────────────────────────────────────────────────────────
 
-/** [0, 1] 클램프 */
+/** [0, 1] 클램프 — NaN/Infinity → 0 (safe default) */
 function clamp01(v: number): number {
+  if (!Number.isFinite(v)) return 0;  // NaN/Infinity → safe default
   return Math.max(0, Math.min(1, v));
 }
 

@@ -293,10 +293,10 @@ describe('sendBatch — 전송 로직', () => {
 });
 
 // =============================================================================
-// 4. resubmitUnsent — BUG-5 unsent 파일 재전송 (60초 throttle + stale 삭제)
+// 4. resubmitUnsent — unsent 파일 재전송 (60초 throttle + stale 삭제)
 // =============================================================================
 
-describe('resubmitUnsent — BUG-5 unsent 백업 재전송', () => {
+describe('resubmitUnsent — unsent 백업 재전송', () => {
 
   const readdir = () => fs.promises.readdir as jest.Mock;
   const stat    = () => fs.promises.stat as jest.Mock;

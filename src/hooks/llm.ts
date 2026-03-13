@@ -227,12 +227,12 @@ function registerLlmOutput(
     const signal = buildSignalPayload(state, {
       event_type: 'llm_output',
       llm_model: model || undefined,
-      llm_tokens_total: totalTokens || undefined,
-      output_tokens: outputTokens || undefined,
-      input_tokens: inputTokens || undefined,
+      llm_tokens_total: totalTokens ?? undefined,
+      output_tokens: outputTokens ?? undefined,
+      input_tokens: inputTokens ?? undefined,
       latency_ms: latency ?? undefined,
-      cache_read_tokens: cacheRead || undefined,
-      cache_write_tokens: cacheWrite || undefined,
+      cache_read_tokens: cacheRead ?? undefined,
+      cache_write_tokens: cacheWrite ?? undefined,
     });
     bufferSignal(sessionKey, signal);
 

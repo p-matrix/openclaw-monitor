@@ -1,6 +1,6 @@
 {
   "name": "@pmatrix/openclaw-monitor",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Real-time safety monitoring plugin for OpenClaw agents",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,7 +34,7 @@
     "prepublishOnly": "npm run build"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=18"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -48,10 +48,15 @@
     "pmatrix",
     "safety",
     "monitoring",
+    "governance",
     "agent",
-    "plugin"
+    "hooks"
   ],
+  "author": "P-MATRIX <architect@p-matrix.io>",
   "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/p-matrix/openclaw-monitor/issues"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"

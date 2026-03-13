@@ -1,5 +1,5 @@
 // =============================================================================
-// bug-fixes.test.ts — BUG-1 / BUG-4 / BUG-12 자가 검증 테스트
+// bug-fixes.test.ts — 주요 버그 수정 자가 검증 테스트
 // =============================================================================
 
 import * as fs from 'fs';
@@ -45,10 +45,10 @@ function makeConfig(overrides: Partial<PMatrixConfig> = {}): PMatrixConfig {
 }
 
 // =============================================================================
-// BUG-4: validateConfig — allowedChannels 빈 문자열 차단
+// validateConfig — allowedChannels 빈 문자열 차단
 // =============================================================================
 
-describe('BUG-4: validateConfig allowedChannels 검증', () => {
+describe('validateConfig allowedChannels 검증', () => {
 
   test('정상 케이스: enabled=false 이면 allowedChannels 내 빈 문자열 검사 스킵', () => {
     const config = makeConfig({
@@ -95,10 +95,10 @@ describe('BUG-4: validateConfig allowedChannels 검증', () => {
 });
 
 // =============================================================================
-// BUG-12: extractText — 순환 참조 객체 처리 (try-catch 패턴 검증)
+// extractText — 순환 참조 객체 처리 (try-catch 패턴 검증)
 // =============================================================================
 
-describe('BUG-12: 순환 참조 JSON.stringify 안전 처리', () => {
+describe('순환 참조 JSON.stringify 안전 처리', () => {
 
   // extractText는 내부 함수라 직접 호출 불가.
   // 동일 패턴(fix 적용 후)을 인라인으로 재현하여 검증.
@@ -146,10 +146,10 @@ describe('BUG-12: 순환 참조 JSON.stringify 안전 처리', () => {
 });
 
 // =============================================================================
-// BUG-1: resubmitUnsent — fs.promises.* (Async) 사용 검증
+// resubmitUnsent — fs.promises.* (Async) 사용 검증
 // =============================================================================
 
-describe('BUG-1: resubmitUnsent Async I/O 검증', () => {
+describe('resubmitUnsent Async I/O 검증', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();

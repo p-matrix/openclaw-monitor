@@ -61,7 +61,7 @@ const DEFAULT_CONFIG: PMatrixConfig = {
   outboundAllowlist: DEFAULT_OUTBOUND_ALLOWLIST,
   dataSharing: false,  // opt-in — 동의 전까지 서버 전송 안 함 (§11)
   batch: DEFAULT_BATCH,
-  frameworkTag: 'beta',
+  frameworkTag: 'stable',
   debug: false,
 };
 
@@ -163,7 +163,7 @@ export function loadConfig(configPath?: string): PMatrixConfig {
 /**
  * 설정 유효성 검증 — confirmTimeoutMs 범위 강제 (§14-6)
  * @throws Error confirmTimeoutMs가 허용 범위 밖일 때
- * @throws Error allowedChannels에 빈 문자열이 포함된 경우 (BUG-4)
+ * @throws Error allowedChannels에 빈 문자열이 포함된 경우
  */
 export function validateConfig(config: PMatrixConfig): void {
   const t = config.safetyGate.confirmTimeoutMs;
@@ -174,7 +174,7 @@ export function validateConfig(config: PMatrixConfig): void {
     );
   }
 
-  // BUG-4: 빈 문자열 allowedChannel → startsWith("") = 항상 true → Allowlist 무력화
+  // 빈 문자열 allowedChannel → startsWith("") = 항상 true → Allowlist 무력화
   if (config.outboundAllowlist.enabled) {
     const hasEmpty = config.outboundAllowlist.allowedChannels.some(
       (c) => c.trim() === ''

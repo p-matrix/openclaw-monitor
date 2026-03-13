@@ -51,6 +51,9 @@ const HIGH_RISK_TOOLS = new Set([
   'computer',        // 커서 제어 + 클릭
   'terminal',
   'code_interpreter',
+  'write',           // Write tool (file creation)
+  'edit',            // Edit tool (file modification)
+  'multiedit',       // MultiEdit
 ]);
 
 /** MEDIUM 위험 도구명 세트 (소문자 정확 일치) */
@@ -61,6 +64,9 @@ const MEDIUM_RISK_TOOLS = new Set([
   'request',
   'curl',
   'wget',
+  'webfetch',        // WebFetch tool
+  'websearch',       // WebSearch tool
+  'task',            // Task (subagent spawning)
 ]);
 
 /** LOW 위험 도구명 접두사 (소문자 startsWith) */
@@ -77,12 +83,14 @@ const LOW_TOOL_PREFIXES = [
   'cat',
   'head',
   'tail',
+  'todoread',
+  'todowrite',
 ];
 
 /**
  * 도구 위험 등급 분류
  *
- * 우선순위: customToolRisk > LOW_PREFIXES > HIGH_SET > MEDIUM_SET > 기본값(MEDIUM)
+ * 우선순위: customToolRisk > HIGH_SET > MEDIUM_SET > LOW_PREFIXES > 기본값(MEDIUM)
  */
 export function classifyToolRisk(
   toolName: string,
@@ -96,16 +104,16 @@ export function classifyToolRisk(
 
   const lower = toolName.toLowerCase();
 
-  // 2. LOW prefix 체크
+  // 2. HIGH 정확 일치 (exact match first — prevents prefix false negatives)
+  if (HIGH_RISK_TOOLS.has(lower)) return 'HIGH';
+
+  // 3. MEDIUM 정확 일치
+  if (MEDIUM_RISK_TOOLS.has(lower)) return 'MEDIUM';
+
+  // 4. LOW prefix 체크
   if (LOW_TOOL_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
     return 'LOW';
   }
-
-  // 3. HIGH 정확 일치
-  if (HIGH_RISK_TOOLS.has(lower)) return 'HIGH';
-
-  // 4. MEDIUM 정확 일치
-  if (MEDIUM_RISK_TOOLS.has(lower)) return 'MEDIUM';
 
   // 5. 알 수 없는 도구 → MEDIUM (보수적 기본값)
   return 'MEDIUM';
@@ -223,6 +231,18 @@ const META_CONTROL_RULES: readonly MetaControlRule[] = [
     pattern: /(?:curl|wget)\s+[^\|]+\|\s*(?:ba)?sh\b/i,
     reason: '원격 코드 실행 패턴 감지 (curl/wget | sh)',
     metaControlDelta: -0.20,
+  },
+  {
+    // base64 decode | sh → meta_control -0.25 (난독화 RCE)
+    pattern: /base64\s+(?:--decode|-d)\s+.*\|\s*(?:ba)?sh\b/i,
+    reason: '난독화된 원격 코드 실행 패턴 (base64 decode | sh)',
+    metaControlDelta: -0.25,
+  },
+  {
+    // chmod 777 / → meta_control -0.15 (위험한 권한 변경)
+    pattern: /chmod\s+777\s+\//i,
+    reason: '위험한 권한 변경 감지 (chmod 777 /)',
+    metaControlDelta: -0.15,
   },
 ] as const;
 

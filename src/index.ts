@@ -63,7 +63,7 @@ export function setup(api: OpenClawPluginAPI): void {
     return;
   }
 
-  // L-3: config에서 frameworkTag 읽어 모듈 수준 설정
+  // config에서 frameworkTag 읽어 모듈 수준 설정
   if (config.frameworkTag) setFrameworkTag(config.frameworkTag);
 
   const client = new PMatrixHttpClient(config);

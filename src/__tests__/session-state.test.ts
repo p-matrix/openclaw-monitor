@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 // =============================================================================
-// 1. computeLocalRt — R(t) = 1 - (baseline + norm + (1-stability) + meta_control) / 4
+// 1. computeLocalRt — 4축 기반 R(t) 계산
 // =============================================================================
 
 describe('computeLocalRt — 공식 및 클램프', () => {
@@ -537,7 +537,7 @@ describe('buildSignalPayload — 페이로드 구조 및 axesOverride', () => {
     expect(payload.agent_id).toBe('agent-42');
     expect(payload.signal_source).toBe('adapter_stream');
     expect(payload.framework).toBe('openclaw');
-    expect(payload.framework_tag).toBe('beta');
+    expect(payload.framework_tag).toBe('stable');
     expect(payload.state_vector).toBeNull();
     expect(payload.metadata['event_type']).toBe('test_event');
     expect(payload.metadata['channel']).toBe('slack:#general');

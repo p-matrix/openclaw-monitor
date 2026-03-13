@@ -11,7 +11,7 @@
 
 import { OpenClawPluginAPI, PMatrixConfig } from '../types';
 import { PMatrixHttpClient } from '../client';
-import { sessions, popBuffer, getBufferSize } from '../session-state';
+import { sessions, popBuffer, getBufferSize, updateRtCache } from '../session-state';
 
 // ─── 등록 진입점 ──────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ export function registerBatchService(
       // 주기 플러시 인터벌 설정 — 즉시 반환, interval은 백그라운드 유지
       _batchIntervalId = setInterval(() => {
         void flushAllSessions(api, config, client);
-        void client.resubmitUnsent();  // BUG-5: unsent 백업 파일 재전송 (60초 throttle)
+        void client.resubmitUnsent();  // unsent 백업 파일 재전송 (60초 throttle)
       }, config.batch.flushIntervalMs);
 
       if (config.debug) {
@@ -112,7 +112,13 @@ async function flushSession(
   if (signals.length === 0) return;
 
   try {
-    await client.sendBatch(signals);
+    const response = await client.sendBatch(signals);
+
+    // Update R(t) cache from server response
+    const rtData = PMatrixHttpClient.extractRtFromResponse(response);
+    if (rtData) {
+      updateRtCache(sessionKey, rtData.rt, rtData.mode, rtData.grade, null, rtData.axes);
+    }
 
     if (config.debug) {
       api.logger.info(

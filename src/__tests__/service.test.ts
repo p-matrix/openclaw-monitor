@@ -255,7 +255,7 @@ describe('flushSession — 전송 실패 처리', () => {
 // 4. resubmitUnsent — 매 interval마다 호출
 // =============================================================================
 
-describe('resubmitUnsent — 주기적 호출 (BUG-5)', () => {
+describe('resubmitUnsent — 주기적 호출', () => {
 
   test('interval마다 client.resubmitUnsent() 1회씩 호출', async () => {
     const api = makeMockApi();

@@ -212,7 +212,7 @@ function registerSessionEnd(
         endReason: event['reason'] as string | undefined,
         signal_source: 'adapter_stream',
         framework: 'openclaw',
-        framework_tag: 'beta',
+        framework_tag: config.frameworkTag ?? 'stable',
       });
     }
 

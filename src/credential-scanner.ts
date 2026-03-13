@@ -2,7 +2,7 @@
 // @pmatrix/openclaw-monitor — credential-scanner.ts
 // 크레덴셜 탐지 스캐너 (§3-2, §8)
 //
-// 탐지 패턴 11종 + 코드블록 제외(MVP 필수 §8-3) + TEST_EXCLUSIONS
+// 탐지 패턴 16종 + 코드블록 제외(MVP 필수 §8-3) + TEST_EXCLUSIONS
 // 순수 함수 — 외부 상태·I/O 없음
 // =============================================================================
 
@@ -26,6 +26,10 @@ const CREDENTIAL_PATTERNS: readonly CredentialPattern[] = [
   {
     name: 'OpenAI Project Key',
     pattern: /sk-proj-[A-Za-z0-9\-_]{20,}/,
+  },
+  {
+    name: 'OpenAI Legacy Key',
+    pattern: /sk-(?!proj-|ant-|test-|fake-)[A-Za-z0-9]{20,}/,
   },
   {
     name: 'Anthropic Key',
@@ -57,7 +61,7 @@ const CREDENTIAL_PATTERNS: readonly CredentialPattern[] = [
   },
   {
     name: 'Bearer Token',
-    pattern: /Bearer\s+[A-Za-z0-9\-_]{20,}/,
+    pattern: /Authorization:\s*Bearer\s+[A-Za-z0-9\-_.]{20,}/,
   },
   {
     name: 'Google AI Key',
@@ -66,6 +70,22 @@ const CREDENTIAL_PATTERNS: readonly CredentialPattern[] = [
   {
     name: 'Stripe Secret Key',
     pattern: /sk_(?:live|test)_[A-Za-z0-9]{24,}/,
+  },
+  {
+    name: 'Slack Token',
+    pattern: /xox[bpras]-[A-Za-z0-9\-]{10,}/,
+  },
+  {
+    name: 'npm Token',
+    pattern: /npm_[A-Za-z0-9]{36}/,
+  },
+  {
+    name: 'SendGrid Key',
+    pattern: /SG\.[A-Za-z0-9\-_]{22,}\.[A-Za-z0-9\-_]{22,}/,
+  },
+  {
+    name: 'Discord Bot Token',
+    pattern: /[MN][A-Za-z0-9]{23,}\.[A-Za-z0-9\-_]{6}\.[A-Za-z0-9\-_]{27,}/,
   },
 ] as const;
 
@@ -155,23 +175,6 @@ export function scanCredentials(
   }
 
   return results;
-}
-
-/**
- * 빠른 사전 체크 — 스캔 전 명백한 거짓 양성 전체 텍스트 판단
- * "your-api-key-here" 등이 포함된 문서 전체 스킵 (선택적 최적화)
- */
-export function isLikelyTestContent(text: string): boolean {
-  const lower = text.toLowerCase();
-  return (
-    lower.includes('your-api-key-here') ||
-    lower.includes('insert_key') ||
-    lower.includes('replace_with') ||
-    lower.includes('<your_') ||
-    // 마크다운 예시 섹션
-    lower.includes('## example') ||
-    lower.includes('# example')
-  );
 }
 
 // ─── 내부 헬퍼 ────────────────────────────────────────────────────────────────

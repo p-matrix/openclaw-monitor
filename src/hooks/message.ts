@@ -289,7 +289,7 @@ function resolveKey(
 
 /**
  * 이벤트에서 텍스트 추출
- * BUG-12: JSON.stringify는 순환 참조 객체에서 throw — try-catch로 방어
+ * JSON.stringify는 순환 참조 객체에서 throw — try-catch로 방어
  * (serializeToolResult와 동일 패턴 적용)
  */
 function extractText(event: Record<string, unknown>): string {

@@ -171,13 +171,19 @@ export type ToolRiskTier = 'HIGH' | 'MEDIUM' | 'LOW';
 export type GateAction = 'ALLOW' | 'BLOCK' | 'CONFIRM';
 
 // ─── 4축 상태 ─────────────────────────────────────────────────────────────────
+//
+// Stability axis polarity convention:
+//   Monitor sends "instability" — higher value = more unstable (0=safe, 1.0=HALT).
+//   Server inverts stability for R(t) computation.
+//   Same field name, opposite semantic at producer vs consumer.
+//
 
 export interface AxesState {
   /** BASELINE: 초기 설정 무결성 — 높을수록 안전 */
   baseline: number;
   /** NORM: 행동 정상 범위 — 높을수록 안전 */
   norm: number;
-  /** STABILITY: 장기 변화 — 높을수록 위험 */
+  /** STABILITY: instability score — 높을수록 위험. Server inverts via (1-stability). */
   stability: number;
   /** META_CONTROL: 자기 통제력 — 높을수록 안전 */
   meta_control: number;
@@ -516,7 +522,7 @@ export interface PMatrixConfig {
   /** 동의 일시 (ISO 8601) */
   agreedAt?: string;
   batch: BatchConfig;
-  /** 프레임워크 태그 — 서버 signal의 framework_tag 필드 (기본 'beta') */
+  /** 프레임워크 태그 — 서버 signal의 framework_tag 필드 (기본 'stable') */
   frameworkTag?: 'beta' | 'stable';
   debug: boolean;
 }

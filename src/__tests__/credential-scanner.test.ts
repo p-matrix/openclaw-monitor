@@ -1,69 +1,16 @@
 // =============================================================================
-// credential-scanner.test.ts — scanCredentials / isLikelyTestContent 자가 검증
+// credential-scanner.test.ts — scanCredentials 자가 검증
 // =============================================================================
 //
 // 검증 범위:
-//   1. isLikelyTestContent — 6가지 조건, 대소문자 무시
-//   2. 기본 동작 — 빈 문자열, 크레덴셜 없음, isLikelyTestContent 조기 반환
+//   1. 기본 동작 — 빈 문자열, 크레덴셜 없음
 //   3. 내장 패턴 11종 — 각 패턴별 탐지, 복수 패턴, count 누적
 //   4. TEST_EXCLUSIONS 필터 — 개별 매칭값 필터 vs 전체 텍스트 필터 구분
 //   5. 코드블록 제거 — 펜스드(```/~~~), 인라인(`), 코드블록 밖 탐지
 //   6. 커스텀 패턴 — 유효/무효 정규식, TEST_EXCLUSIONS 적용, 내장 패턴 공존
 // =============================================================================
 
-import { scanCredentials, isLikelyTestContent } from '../credential-scanner';
-
-// =============================================================================
-// isLikelyTestContent — 빠른 전체 텍스트 사전 체크
-// =============================================================================
-
-describe('isLikelyTestContent', () => {
-
-  test('빈 문자열 → false', () => {
-    expect(isLikelyTestContent('')).toBe(false);
-  });
-
-  test('"your-api-key-here" 포함 → true', () => {
-    expect(isLikelyTestContent('OPENAI_KEY=your-api-key-here')).toBe(true);
-  });
-
-  test('"YOUR-API-KEY-HERE" (대문자) → true (toLowerCase 처리)', () => {
-    // lower.includes('your-api-key-here') — 소문자 변환 후 비교
-    expect(isLikelyTestContent('export KEY=YOUR-API-KEY-HERE')).toBe(true);
-  });
-
-  test('"insert_key" 포함 → true', () => {
-    expect(isLikelyTestContent('Please insert_key in config')).toBe(true);
-  });
-
-  test('"replace_with" 포함 → true', () => {
-    expect(isLikelyTestContent('replace_with your actual key')).toBe(true);
-  });
-
-  test('"<your_" 포함 → true (대소문자 무시)', () => {
-    // "<YOUR_ANTHROPIC_KEY>" → lower = "<your_anthropic_key>" → includes '<your_')
-    expect(isLikelyTestContent('API_KEY=<YOUR_ANTHROPIC_KEY>')).toBe(true);
-  });
-
-  test('"## example" 포함 → true', () => {
-    // ## Example → lower includes '## example'
-    expect(isLikelyTestContent('## Example\nSome content here')).toBe(true);
-  });
-
-  test('"# example" 포함 → true', () => {
-    expect(isLikelyTestContent('# Example Usage\nCode here')).toBe(true);
-  });
-
-  test('일반 텍스트 (아무 조건 미해당) → false', () => {
-    expect(isLikelyTestContent('Hello world. This is production code.')).toBe(false);
-  });
-
-  test('실제 크레덴셜 형식 텍스트 → false (패턴 스캔 아님)', () => {
-    // isLikelyTestContent는 템플릿 텍스트 감지용 — 실제 크레덴셜은 true 반환 안 함
-    expect(isLikelyTestContent('sk-proj-abcdefghijklmnopqrstu is the key')).toBe(false);
-  });
-
-});
+import { scanCredentials } from '../credential-scanner';
 
 // =============================================================================
 // scanCredentials — 기본 동작

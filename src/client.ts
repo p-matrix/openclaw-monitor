@@ -24,7 +24,7 @@ const RETRY_DELAYS = [100, 500, 2_000] as const;
 
 const REQUEST_TIMEOUT_MS = 10_000;  // 개별 HTTP 요청 타임아웃
 
-// BUG-5: unsent 파일 재전송 상수
+// unsent 파일 재전송 상수
 const RESUBMIT_INTERVAL_MS = 60_000;        // 60초마다 최대 1회 시도
 const MAX_RESUBMIT_FILES   = 5;             // 1회 처리 파일 수 상한
 const MAX_UNSENT_AGE_MS    = 7 * 24 * 60 * 60 * 1_000;  // 7일 경과 → stale 삭제
@@ -57,7 +57,7 @@ export class PMatrixHttpClient {
   private readonly agentId: string;
   private readonly retryMax: number;
   private readonly debug: boolean;
-  private lastResubmitAt: number = 0;  // BUG-5: throttle 기준 시각
+  private lastResubmitAt: number = 0;  // throttle 기준 시각
 
   constructor(config: PMatrixConfig) {
     this.baseUrl = config.serverUrl.replace(/\/$/, '');
@@ -94,6 +94,7 @@ export class PMatrixHttpClient {
   async getAgentGrade(agentId: string): Promise<GradeResponse> {
     const url = `${this.baseUrl}/v1/agents/${encodeURIComponent(agentId)}/public`;
     const raw = await this.fetchWithRetry('GET', url, null);
+    // TODO(runtime-guard): validate shape at runtime if payload schema drifts
     return raw as GradeResponse;
   }
 
@@ -104,23 +105,32 @@ export class PMatrixHttpClient {
    */
   async sendBatch(signals: SignalPayload[]): Promise<BatchSendResponse> {
     if (signals.length === 0) return { received: 0 };
+    // Defense-in-depth: all-zero axes → R(t)=0.75 → instant HALT.
+    // Correct to neutral (0.5) before transmission.
+    for (const s of signals) {
+      if (s.baseline === 0 && s.norm === 0 && s.stability === 0 && s.meta_control === 0) {
+        s.baseline = 0.5;
+        s.norm = 0.5;
+        s.stability = 0.5;
+        s.meta_control = 0.5;
+      }
+    }
     try {
       return await this.sendBatchDirect(signals);
     } catch (err) {
-      this.backupToLocal(signals);
+      await this.backupToLocal(signals);
       throw err;
     }
   }
 
   /**
-   * BUG-5: unsent 파일 재전송
+   * unsent 파일 재전송
    *
    * 60초 throttle — 서버가 살아났을 때 주기적으로 최대 MAX_RESUBMIT_FILES개 재전송.
    * 7일 초과 stale 파일은 재전송 없이 삭제.
    * backupToLocal과 루프를 피하기 위해 sendBatchDirect(retry 포함, backup 없음) 사용.
    * 전체 silent fail — Plugin 동작 방해 안 함.
-   *
-   * BUG-1: Sync I/O → fs.promises.* 비동기로 교체 (이벤트 루프 블로킹 방지)
+   * fs.promises.* 비동기 사용 (이벤트 루프 블로킹 방지)
    */
   async resubmitUnsent(): Promise<void> {
     const now = Date.now();
@@ -187,7 +197,7 @@ export class PMatrixHttpClient {
       }
     } catch {
       // 긴급 신호 실패 시 로컬 백업 — Plugin 동작은 계속
-      this.backupToLocal([signal]);
+      await this.backupToLocal([signal]);
     }
   }
 
@@ -241,10 +251,11 @@ export class PMatrixHttpClient {
     const url = `${this.baseUrl}/v1/inspect/stream`;
     const payload: SignalPayload = {
       agent_id: data.agentId,
-      baseline: 0,
-      norm: 0,
-      stability: 0,
-      meta_control: 0,
+      // Issue D: neutral axes — avoids all-zero → R(t)=0.75 (HALT) grade pollution
+      baseline: 0.5,
+      norm: 0.5,
+      stability: 0.5,
+      meta_control: 0.5,
       timestamp: new Date().toISOString(),
       signal_source: 'adapter_stream',
       framework: 'openclaw',
@@ -266,7 +277,7 @@ export class PMatrixHttpClient {
     try {
       await this.fetchWithRetry('POST', url, payload);
     } catch {
-      this.backupToLocal([payload]);
+      await this.backupToLocal([payload]);
     }
   }
 
@@ -312,6 +323,7 @@ export class PMatrixHttpClient {
     const url = `${this.baseUrl}/v1/inspect/stream`;
     const body = signals.length === 1 ? signals[0] : signals;
     const raw = await this.fetchWithRetry('POST', url, body);
+    // TODO(runtime-guard): validate shape at runtime if payload schema drifts
     return (raw as BatchSendResponse | null) ?? { received: signals.length };
   }
 

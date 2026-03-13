@@ -93,7 +93,7 @@ describe('applyNormDelta', () => {
     expect(result).not.toBeNull();
     expect(result!.norm).toBeCloseTo(0.9, 4);
     expect(state.axes.norm).toBeCloseTo(0.9, 4);
-    // R(t) = 1 - (1.0 + 0.9 + (1-0) + 1.0) / 4 = 1 - 3.9/4 = 1 - 0.975 = 0.025
+    // expected R(t) ≈ 0.025
     expect(state.currentRt).toBeCloseTo(0.025, 4);
   });
 

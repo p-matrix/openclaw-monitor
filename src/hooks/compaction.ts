@@ -66,8 +66,8 @@ function registerBeforeCompaction(
 
     const signal = buildSignalPayload(state, {
       event_type: 'before_compaction',
-      current_message_count: currentMessageCount || undefined,
-      estimated_tokens: estimatedTokens || undefined,
+      current_message_count: currentMessageCount ?? undefined,
+      estimated_tokens: estimatedTokens ?? undefined,
     });
     bufferSignal(sessionKey, signal);
 
@@ -130,8 +130,8 @@ function registerAfterCompaction(
 
     const signal = buildSignalPayload(state, {
       event_type: 'after_compaction',
-      removed_count: removedCount || undefined,
-      retained_count: retainedCount || undefined,
+      removed_count: removedCount ?? undefined,
+      retained_count: retainedCount ?? undefined,
       compression_ratio: compressionRatio > 0 ? compressionRatio : undefined,
     });
     bufferSignal(sessionKey, signal);
