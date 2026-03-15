@@ -18,6 +18,7 @@
 
 import { OpenClawPluginAPI, PMatrixConfig, HookContext } from '../types';
 import { PMatrixHttpClient } from '../client';
+import type { FieldNode } from '@pmatrix/field-node-runtime';
 import {
   getSession,
   getOrCreateSession,
@@ -35,10 +36,11 @@ import {
 export function registerTurnHooks(
   api: OpenClawPluginAPI,
   config: PMatrixConfig,
-  client: PMatrixHttpClient
+  client: PMatrixHttpClient,
+  fieldNode?: FieldNode | null,
 ): void {
   registerBeforeAgentStart(api, config);
-  registerAgentEnd(api, config);
+  registerAgentEnd(api, config, fieldNode);
 }
 
 // ─── before_agent_start ──────────────────────────────────────────────────────
@@ -56,6 +58,13 @@ function registerBeforeAgentStart(
   api.on('before_agent_start', async (event, ctx) => {
     const sessionKey = resolveKey(ctx, event);
     if (!sessionKey) return {};
+
+    // OC-2: sessionTarget 방어 — stale session에 대한 새 세션 생성 방지
+    const sessionTarget = event['sessionTarget'] as string | undefined;
+    if (sessionTarget && sessionTarget !== 'current') {
+      const existing = getSession(sessionKey);
+      if (!existing) return {};  // stale session → skip (오염 방지)
+    }
 
     const state = getOrCreateSession(sessionKey, config.agentId);
 
@@ -109,7 +118,8 @@ const DRIFT_SIGNIFICANT_DELTA = 0.10;
  */
 function registerAgentEnd(
   api: OpenClawPluginAPI,
-  config: PMatrixConfig
+  config: PMatrixConfig,
+  fieldNode?: FieldNode | null,
 ): void {
   api.on('agent_end', async (event, ctx) => {
     const sessionKey = resolveKey(ctx, event);
@@ -185,7 +195,23 @@ function registerAgentEnd(
       }
     }
 
-    // 4. turnStartedAt 초기화
+    // 4. 4.0 Field: State Vector 전송 (in-process, fail-open)
+    if (fieldNode) {
+      try {
+        fieldNode.sendStateVector({
+          baseline: state.axes.baseline,
+          norm: state.axes.norm,
+          stability: state.axes.stability,
+          meta_control: state.axes.meta_control,
+          loopCount: state.turnNumber,
+          currentMode: state.currentMode,
+        });
+      } catch {
+        // Fail-open: SV 전송 실패해도 턴 처리 계속
+      }
+    }
+
+    // 5. turnStartedAt 초기화
     state.turnStartedAt = null;
 
     if (config.debug) {
@@ -212,6 +238,8 @@ function resolveKey(
     (event['sessionKey'] as string | undefined) ??
     (event['sessionId'] as string | undefined) ??
     (event['session_id'] as string | undefined) ??
+    // ACP Provenance fallback (upstream 2026-03-13)
+    ((event['provenance'] as Record<string, unknown> | undefined)?.['sessionTraceId'] as string | undefined) ??
     null
   );
 }

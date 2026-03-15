@@ -28,6 +28,7 @@ import { registerCommands } from './extensions/commands';
 import { registerGatewayMethods } from './extensions/gateway-methods';
 import { registerBatchService } from './extensions/service';
 import { setFrameworkTag } from './session-state';
+import { FieldNode, isField4Enabled, buildFieldConfigFromEnv } from '@pmatrix/field-node-runtime';
 
 // ─── 공개 타입 재수출 (npm 소비자용) ─────────────────────────────────────────
 
@@ -68,8 +69,22 @@ export function setup(api: OpenClawPluginAPI): void {
 
   const client = new PMatrixHttpClient(config);
 
+  // ── 4.0 Field Node (in-process, fail-open) ────────────────────────────────
+  let fieldNode: FieldNode | null = null;
+  if (isField4Enabled()) {
+    try {
+      const fc = buildFieldConfigFromEnv(config.serverUrl, config.apiKey);
+      if (fc) {
+        fieldNode = new FieldNode(fc);
+        fieldNode.start();
+      }
+    } catch {
+      // Fail-open: Field 초기화 실패해도 3.5 모니터링은 정상 동작
+    }
+  }
+
   // ── Week 1: 세션 라이프사이클 훅 ─────────────────────────────────────────
-  registerSessionHooks(api, config, client);
+  registerSessionHooks(api, config, client, fieldNode);
 
   // ── Week 2: Safety Gate ───────────────────────────────────────────────────
   registerToolHooks(api, config, client);
@@ -83,7 +98,7 @@ export function setup(api: OpenClawPluginAPI): void {
   registerLlmHooks(api, config, client);
 
   // ── GA B-4: 턴 경계 축 업데이트 (before_agent_start, agent_end) ──────────
-  registerTurnHooks(api, config, client);
+  registerTurnHooks(api, config, client, fieldNode);
 
   // ── Tier-2: 컨텍스트 관리 (before_compaction, after_compaction, before_reset) ─
   registerCompactionHooks(api, config);

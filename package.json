@@ -1,6 +1,6 @@
 {
   "name": "@pmatrix/openclaw-monitor",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "P-MATRIX runtime governance monitor for OpenClaw — Safety Gate, Kill Switch, Live Grade",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,6 +36,9 @@
   "engines": {
     "node": ">=18"
   },
+  "dependencies": {
+    "@pmatrix/field-node-runtime": "^0.2.0"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.4.0",
@@ -50,7 +53,10 @@
     "monitoring",
     "governance",
     "agent",
-    "hooks"
+    "hooks",
+    "field",
+    "protocol",
+    "state-vector"
   ],
   "author": "P-MATRIX <architect@p-matrix.io>",
   "license": "Apache-2.0",

@@ -4,6 +4,27 @@ All notable changes to `@pmatrix/openclaw-monitor` will be documented in this fi
 
 ---
 
+## [0.4.0] — 2026-03-15
+
+### Added
+
+- **4.0 Field Integration** — FieldNode in-process 연동, 실측 4축 State Vector 전송
+- ACP Provenance sessionKey fallback (upstream 2026-03-13 대응)
+- sessionTarget 인식 — cron-bound 세션 stale skip 방어
+
+### Changed
+
+- `@pmatrix/field-node-runtime@^0.2.0` 의존성 추가
+- FieldNode 생성 try/catch fail-open (3.5 모니터링 보호)
+
+## [0.3.5] — 2026-03-13
+
+### Fixed
+
+- Credential scanner: 16 patterns (synced with CC/Cursor)
+- Safety Gate check order fix
+- framework_tag config-driven
+
 ## [0.3.4] — 2026-03-11
 
 ### Fixed

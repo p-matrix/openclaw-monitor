@@ -12,6 +12,7 @@ import {
   PMatrixConfig,
 } from '../types';
 import { PMatrixHttpClient } from '../client';
+import type { FieldNode } from '@pmatrix/field-node-runtime';
 import {
   getOrCreateSession,
   getSession,
@@ -31,10 +32,11 @@ import {
 export function registerSessionHooks(
   api: OpenClawPluginAPI,
   config: PMatrixConfig,
-  client: PMatrixHttpClient
+  client: PMatrixHttpClient,
+  fieldNode?: FieldNode | null,
 ): void {
   registerGatewayStart(api, config, client);
-  registerGatewayStop(api, config);
+  registerGatewayStop(api, config, fieldNode);
   registerSessionStart(api, config);
   registerSessionEnd(api, config, client);
 }
@@ -104,12 +106,16 @@ function registerGatewayStart(
 
 function registerGatewayStop(
   api: OpenClawPluginAPI,
-  config: PMatrixConfig
+  config: PMatrixConfig,
+  fieldNode?: FieldNode | null,
 ): void {
   api.on('gateway_stop', async () => {
     // [Tier-2 §A-1] 플러그인 레벨 종료 → pendingChildLinks 전체 정리
     // gateway_stop = 플러그인 프로세스 종료 (세션 레벨 아님) → .clear() 올바름
     pendingChildLinks.clear();
+
+    // 4.0 Field Node 종료 (WS disconnect + audit flush)
+    await fieldNode?.stop();
 
     if (config.debug) {
       api.logger.debug('[P-MATRIX] Gateway 종료.');
@@ -134,6 +140,15 @@ function registerSessionStart(
     }
     const sessionKey = resolveSessionKey(ctx, event);
     if (!sessionKey) return;
+
+    // OC-2: sessionTarget 인식 — cron job이 session:<id> 타겟으로
+    // 이미 종료된 세션에 훅을 발화하면 상태 오염 가능
+    const sessionTarget = event['sessionTarget'] as string | undefined;
+    if (sessionTarget && sessionTarget !== 'current' && config.debug) {
+      api.logger.info(
+        `[P-MATRIX] SessionStart: sessionTarget=${sessionTarget} (cron-bound)`
+      );
+    }
 
     // FIX #67: P-MATRIX agentId는 항상 config에서 사용.
     // OpenClaw event의 agentId는 내부 식별자("a" 등)로, P-MATRIX agent_id와 다름.
@@ -242,7 +257,9 @@ function resolveSessionKey(
   const key =
     ctx.sessionKey ??
     (event['sessionId'] as string | undefined) ??
-    (event['session_id'] as string | undefined);
+    (event['session_id'] as string | undefined) ??
+    // ACP Provenance fallback (upstream 2026-03-13)
+    ((event['provenance'] as Record<string, unknown> | undefined)?.['sessionTraceId'] as string | undefined);
 
   return key ?? null;
 }

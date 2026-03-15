@@ -14,7 +14,7 @@ Blocks dangerous tool calls before execution, detects credential leaks in outgoi
 
 - **Safety Gate** — Intercepts high-risk tool calls before execution.
   Blocks or prompts for confirmation based on current risk level R(t).
-- **Credential Protection** — Detects and blocks 11 types of API keys
+- **Credential Protection** — Detects and blocks 16 types of API keys
   and secrets before they leave the agent.
 - **Kill Switch** — Automatically halts the agent when R(t) ≥ 0.75.
   Manually via `/pmatrix halt`.
@@ -32,13 +32,30 @@ Blocks dangerous tool calls before execution, detects credential leaks in outgoi
 - **Live Grade** — Streams 4-axis safety signals and displays Trust
   Grade (A–E) in real time.
 
+### 4.0 Field Integration (v0.4.0+)
+
+When connected to a P-MATRIX Field, the monitor participates in the 4.0 Protocol with in-process FieldNode and real 4-axis State Vector:
+
+- **State Vector Exchange** — Sends behavioral measurements to Field peers
+- **ACP Provenance fallback** — sessionKey resolution via provenance.sessionTraceId
+- **sessionTarget recognition** — Stale cron-bound session skip
+
+**Activation:** Set both environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `PMATRIX_FIELD_ID` | Field identifier |
+| `PMATRIX_FIELD_NODE_ID` | Node identifier |
+
+When not set, the monitor runs in standalone 3.5 mode (default).
+
 ---
 
 ## Requirements
 
 | Requirement | Version |
 |-------------|---------|
-| Node.js | ≥ 22 |
+| Node.js | >= 18 |
 | P-MATRIX server | v1.0.0+ |
 
 ---
@@ -178,18 +195,24 @@ Timeout: auto-block after 20s
 
 ## Credential Protection
 
-Detects and blocks 11 credential types before they are sent:
+Detects and blocks 16 credential types before they are sent:
 
-- OpenAI API keys (`sk-proj-...`)
+- OpenAI Project keys (`sk-proj-...`)
+- OpenAI Legacy keys (`sk-...`)
 - Anthropic API keys (`sk-ant-...`)
 - AWS Access Keys (`AKIA...`)
-- GitHub tokens (`ghp_...`, `github_pat_...`)
-- Private keys (`-----BEGIN PRIVATE KEY-----`)
-- Database URLs (`postgresql://user:pass@...`)
+- GitHub tokens (`ghp_...`)
+- GitHub Fine-grained tokens (`github_pat_...`)
+- Private keys (PEM) (`-----BEGIN PRIVATE KEY-----`)
+- Database URLs (`postgresql://`, `mysql://`)
 - Passwords (`password: "..."`)
-- Bearer tokens
+- Bearer tokens (`Authorization: Bearer ...`)
 - Google AI keys (`AIza...`)
 - Stripe keys (`sk_live_...`, `sk_test_...`)
+- Slack tokens (`xox[bpras]-...`)
+- npm tokens (`npm_...`)
+- SendGrid keys (`SG....`)
+- Discord Bot tokens
 
 Code blocks in messages are excluded from scanning to prevent false positives.
 
@@ -260,6 +283,12 @@ Trust Grade: A (≥80) · B (≥60) · C (≥40) · D (≥20) · E (<20)
 The plugin sends signals to `POST /v1/inspect/stream` on your P-MATRIX server.
 
 Production server: `https://api.pmatrix.io`
+
+Dashboard: `https://app.pmatrix.io`
+
+- **Story tab** — R(t) trajectory timeline, mode transitions, tool block events
+- **Analytics tab** — Grade history, stability trends
+- **Logs tab** — Live session events, audit trail, META_CONTROL incidents
 
 ---
 
