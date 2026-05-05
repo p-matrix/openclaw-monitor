@@ -151,10 +151,19 @@ function registerSubagentSpawning(
 
     if (config.dataSharing) {
       const mode = String(event['mode'] ?? event['subagentMode'] ?? 'unknown');
+
+      // Breach Taxonomy: infer delegated action type from recent tool context
+      const lastTool = state.recentToolChain.length > 0
+        ? state.recentToolChain[state.recentToolChain.length - 1]
+        : undefined;
+      const delegatedActionType = state.breachSupport?.inferDelegatedActionType(lastTool);
+
       const signal = buildSignalPayload(state, {
         event_type: 'subagent_spawning',
+        event_subtype: 'spawn',
         tool_name: mode,
         subagents_active: recentCount + 1,
+        delegated_action_type: delegatedActionType,
       });
       bufferSignal(sessionKey, signal);
     }

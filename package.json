@@ -1,6 +1,6 @@
 {
   "name": "@pmatrix/openclaw-monitor",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "description": "P-MATRIX runtime governance monitor for OpenClaw — Safety Gate, Kill Switch, Live Grade",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

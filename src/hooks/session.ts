@@ -19,6 +19,7 @@ import {
   deleteSession,
   popBuffer,
   updateRtCache,
+  buildSignalPayload,
   pendingChildLinks,
   sweepStalePendingLinks,
 } from '../session-state';
@@ -215,7 +216,25 @@ function registerSessionEnd(
       await client.flush(remaining, { priority: 'session_end' });
     }
 
-    // 2. 세션 요약 전송 (dataSharing 동의 후에만)
+    // 2a. Breach Taxonomy: session_report 신호 전송 (reporting_duty 매칭)
+    if (state && config.dataSharing && state.breachSupport) {
+      const reportData = state.breachSupport.getSessionReport();
+      const reportSignal = buildSignalPayload(state, {
+        event_type: 'session_report',
+        subject: 'RPT-001',
+        report_type: reportData.report_type,
+        actions_summary: reportData.actions_summary,
+        session_duration_ms: reportData.session_duration_ms,
+        priority: 'critical',
+      });
+      await client.sendCritical(reportSignal).catch((err: Error) => {
+        if (config.debug) {
+          api.logger.debug(`[P-MATRIX] sendCritical session_report failed: ${err.message}`);
+        }
+      });
+    }
+
+    // 2b. 세션 요약 전송 (dataSharing 동의 후에만)
     if (state && config.dataSharing) {
       await client.sendSessionSummary({
         sessionId: sessionKey,

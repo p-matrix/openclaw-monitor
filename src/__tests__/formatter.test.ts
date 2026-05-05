@@ -40,7 +40,7 @@ beforeEach(() => {
 describe('formatGateBlock — Safety Gate 차단 메시지', () => {
 
   test('필수 요소: 차단 키워드, 도구명, R(t), 모드, 사유', () => {
-    const msg = formatGateBlock('bash', 'rm -rf /', 0.60, 'A-2', 'Critical 구간 고위험 도구');
+    const msg = formatGateBlock('bash', 'rm -rf /', 0.60, 'critical', 'Critical 구간 고위험 도구');
     expect(msg).toContain('차단됨');
     expect(msg).toContain('bash');
     expect(msg).toContain('0.60');
@@ -49,8 +49,8 @@ describe('formatGateBlock — Safety Gate 차단 메시지', () => {
   });
 
   test('paramsSummary 비어 있으면 해당 줄 제외 (null 필터)', () => {
-    const withParams = formatGateBlock('bash', 'some params', 0.60, 'A-2', 'reason');
-    const withoutParams = formatGateBlock('bash', '', 0.60, 'A-2', 'reason');
+    const withParams = formatGateBlock('bash', 'some params', 0.60, 'critical', 'reason');
+    const withoutParams = formatGateBlock('bash', '', 0.60, 'critical', 'reason');
     // 빈 문자열은 falsy → null로 처리 → joinLines에서 제거
     expect(withoutParams).not.toContain('some params');
     // params 줄이 빠졌으므로 줄 수가 더 적음
@@ -58,12 +58,12 @@ describe('formatGateBlock — Safety Gate 차단 메시지', () => {
   });
 
   test('R(t) 소수점 2자리 포맷', () => {
-    const msg = formatGateBlock('bash', '', 0.6, 'A-2', 'reason');
+    const msg = formatGateBlock('bash', '', 0.6, 'critical', 'reason');
     expect(msg).toContain('0.60');  // toFixed(2)
   });
 
   test('Halt 모드(A-0) 아이콘/레이블 포함', () => {
-    const msg = formatGateBlock('exec', '', 0.80, 'A-0', 'Halt 상태');
+    const msg = formatGateBlock('exec', '', 0.80, 'halt', 'Halt 상태');
     expect(msg).toContain('Halt');
     expect(msg).toContain('🛑');
   });
@@ -77,7 +77,7 @@ describe('formatGateBlock — Safety Gate 차단 메시지', () => {
 describe('formatGateConfirm — Safety Gate 확인 요청 메시지', () => {
 
   test('필수 요소: 확인 필요, 도구명, R(t), 모드, /pmatrix allow once, 타임아웃', () => {
-    const msg = formatGateConfirm('browser', 'submit form', 0.35, 'A-1', 'Alert 구간 고위험', 20);
+    const msg = formatGateConfirm('browser', 'submit form', 0.35, 'alert', 'Alert 구간 고위험', 20);
     expect(msg).toContain('확인 필요');
     expect(msg).toContain('browser');
     expect(msg).toContain('0.35');
@@ -87,12 +87,12 @@ describe('formatGateConfirm — Safety Gate 확인 요청 메시지', () => {
   });
 
   test('타임아웃 값이 메시지에 반영됨', () => {
-    const msg = formatGateConfirm('bash', '', 0.20, 'A+0', 'Caution', 15);
+    const msg = formatGateConfirm('bash', '', 0.20, 'caution', 'Caution', 15);
     expect(msg).toContain('15초');
   });
 
   test('fail-closed 설명 포함', () => {
-    const msg = formatGateConfirm('bash', '', 0.20, 'A+0', 'reason', 20);
+    const msg = formatGateConfirm('bash', '', 0.20, 'caution', 'reason', 20);
     expect(msg).toContain('fail-closed');
   });
 

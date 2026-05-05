@@ -12,19 +12,19 @@ import { SafetyMode, TrustGrade, SessionState } from '../types';
 const SEP = '─────────────────────────────────────────';
 
 const MODE_ICON: Readonly<Record<SafetyMode, string>> = {
-  'A+1': '✅',
-  'A+0': '💛',
-  'A-1': '🟠',
-  'A-2': '🔴',
-  'A-0': '🛑',
+  'normal': '✅',
+  'caution': '💛',
+  'alert': '🟠',
+  'critical': '🔴',
+  'halt': '🛑',
 };
 
 const MODE_LABEL: Readonly<Record<SafetyMode, string>> = {
-  'A+1': 'Normal',
-  'A+0': 'Caution',
-  'A-1': 'Alert',
-  'A-2': 'Critical',
-  'A-0': 'Halt',
+  'normal': 'Normal',
+  'caution': 'Caution',
+  'alert': 'Alert',
+  'critical': 'Critical',
+  'halt': 'Halt',
 };
 
 const GRADE_ICON: Readonly<Record<TrustGrade, string>> = {

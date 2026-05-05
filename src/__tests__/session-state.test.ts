@@ -119,7 +119,7 @@ describe('세션 CRUD — createSession / getSession / getOrCreateSession / dele
     expect(state.turnNumber).toBe(0);
     expect(state.isHalted).toBe(false);
     expect(state.currentRt).toBeCloseTo(0.0);
-    expect(state.currentMode).toBe('A+1');
+    expect(state.currentMode).toBe('normal');
     expect(state.signalBuffer).toHaveLength(0);
     expect(state.dangerEvents).toBe(0);
     expect(state.credentialBlocks).toBe(0);
@@ -337,12 +337,12 @@ describe('applyMetaControlDelta — meta_control 업데이트 및 클램프', ()
 
   test('applyMetaControlDelta → currentMode도 갱신됨', () => {
     createSession('s', 'a');
-    // 초기: R(t)=0.0 → mode='A+1'
-    // -0.30×6 = meta_control→0.0→R(t)=0.25→'A-1'
+    // 초기: R(t)=0.0 → mode='normal'
+    // -0.30×6 = meta_control→0.0→R(t)=0.25→'alert'
     for (let i = 0; i < 6; i++) applyMetaControlDelta('s', -0.30);
     const state = getSession('s')!;
-    // meta_control clamped at 0.0, R(t)=0.25 → 0.15≤0.25<0.30 → 'A-1'
-    expect(['A+0', 'A-1', 'A-2']).toContain(state.currentMode);
+    // meta_control clamped at 0.0, R(t)=0.25 → 0.15≤0.25<0.30 → 'alert'
+    expect(['caution', 'alert', 'critical']).toContain(state.currentMode);
   });
 
 });
@@ -360,13 +360,13 @@ describe('R(t) 캐시 — updateRtCache / isRtCacheValid / getLocalRt', () => {
 
   test('updateRtCache 후 → isRtCacheValid = true (30초 TTL)', () => {
     createSession('s', 'a');
-    updateRtCache('s', 0.25, 'A-1', 'B', null, { baseline: 0.9, norm: 0.9, stability: 0.1, meta_control: 0.9 });
+    updateRtCache('s', 0.25, 'alert', 'B', null, { baseline: 0.9, norm: 0.9, stability: 0.1, meta_control: 0.9 });
     expect(isRtCacheValid('s')).toBe(true);
   });
 
   test('updateRtCache 후 → getLocalRt 갱신됨', () => {
     createSession('s', 'a');
-    updateRtCache('s', 0.42, 'A-2', null, null, { baseline: 0.8, norm: 0.8, stability: 0.2, meta_control: 0.8 });
+    updateRtCache('s', 0.42, 'critical', null, null, { baseline: 0.8, norm: 0.8, stability: 0.2, meta_control: 0.8 });
     expect(getLocalRt('s')).toBeCloseTo(0.42, 6);
   });
 

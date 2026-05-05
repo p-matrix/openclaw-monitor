@@ -159,7 +159,7 @@ export interface HookResult {
 // ─── 5-Mode 및 Grade ──────────────────────────────────────────────────────────
 
 /** P-MATRIX 5-Mode (Server constants.py 경계값 기준) */
-export type SafetyMode = 'A+1' | 'A+0' | 'A-1' | 'A-2' | 'A-0';
+export type SafetyMode = 'normal' | 'caution' | 'alert' | 'critical' | 'halt';
 
 /** Trust Grade */
 export type TrustGrade = 'A' | 'B' | 'C' | 'D' | 'E';
@@ -187,6 +187,43 @@ export interface AxesState {
   stability: number;
   /** META_CONTROL: 자기 통제력 — 높을수록 안전 */
   meta_control: number;
+}
+
+// ─── BreachSupport 인스턴스 인터페이스 (순환 import 방지용) ─────────────────────
+
+/**
+ * breach-support.ts BreachSupport 클래스의 공개 계약.
+ * types.ts에서 직접 import하면 순환 의존이 발생하므로 인터페이스로 분리.
+ */
+export interface BreachSupportInstance {
+  isInScope(actionPrimitive: string, filePath?: string): boolean | null;
+  recordApprovalRequested(actionId: string, toolName: string): void;
+  recordApprovalGranted(actionId: string): void;
+  recordApprovalDenied(actionId: string): void;
+  recordBlockedAction(toolName: string, reason: string): void;
+  getRecentBlocked(windowMs?: number): { tool_name: string; timestamp: number; reason: string }[];
+  incrementToolCalls(): void;
+  incrementFileModifications(): void;
+  incrementErrors(): void;
+  incrementDenied(): void;
+  getToolCallCount(): number;
+  getFileModCount(): number;
+  getSessionReport(): {
+    report_type: string;
+    actions_summary: {
+      tool_calls_count: number;
+      file_modifications_count: number;
+      errors_count: number;
+      denied_count: number;
+    };
+    session_duration_ms?: number;
+  };
+  inferDelegatedActionType(lastToolName?: string): string | undefined;
+  enrichMetadata(base: Record<string, any>, opts?: {
+    actionPrimitive?: string;
+    filePath?: string;
+    toolName?: string;
+  }): Record<string, any>;
 }
 
 // ─── SessionState ─────────────────────────────────────────────────────────────
@@ -326,6 +363,10 @@ export interface SessionState {
   totalInputTokens: number;
   /** 세션 누적 출력 토큰 수 (cost-tracker.ts 갱신) */
   totalOutputTokens: number;
+
+  // ── Breach Taxonomy 지원 (breach-support.ts) ────────────────────────────────
+  /** BreachSupport 인스턴스 — scope tagging, approval tracking, blocked action history */
+  breachSupport: BreachSupportInstance | null;
 }
 
 // ─── 신호 페이로드 ────────────────────────────────────────────────────────────

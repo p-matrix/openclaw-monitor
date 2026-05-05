@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import {
   PMatrixConfig,
   SignalPayload,
@@ -17,10 +18,31 @@ import {
   TrustGrade,
 } from './types';
 
+// ─── Runtime shape guards ─────────────────────────────────────────────────────
+// Payload 스키마 drift를 런타임에서 감지하는 방어적 검증.
+// 응답이 형식에 맞지 않으면 throw → 호출자는 네트워크 실패와 동일하게 처리.
+
+function assertGradeResponseShape(raw: unknown): asserts raw is GradeResponse {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('PMatrix API: GradeResponse payload not an object');
+  }
+  const r = raw as Record<string, unknown>;
+  if (typeof r.agent_id !== 'string' || typeof r.grade !== 'string' || !r.axes) {
+    throw new Error('PMatrix API: GradeResponse missing required fields (agent_id/grade/axes)');
+  }
+}
+
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 
 /** retry backoff 딜레이 (ms) — 1차: 100ms, 2차: 500ms, 3차: 2,000ms */
 const RETRY_DELAYS = [100, 500, 2_000] as const;
+
+/**
+ * Burst rate limit (HTTP 429) 전용 backoff — server burst_rate_limit middleware
+ * (commit 533781f) 정합. Retry-After 헤더 부재 시 사용.
+ * 1차: 1s, 2차: 5s, 3차: 30s — 일반 RETRY_DELAYS 보다 보수적.
+ */
+const BURST_RETRY_DELAYS = [1_000, 5_000, 30_000] as const;
 
 const REQUEST_TIMEOUT_MS = 10_000;  // 개별 HTTP 요청 타임아웃
 
@@ -28,6 +50,43 @@ const REQUEST_TIMEOUT_MS = 10_000;  // 개별 HTTP 요청 타임아웃
 const RESUBMIT_INTERVAL_MS = 60_000;        // 60초마다 최대 1회 시도
 const MAX_RESUBMIT_FILES   = 5;             // 1회 처리 파일 수 상한
 const MAX_UNSENT_AGE_MS    = 7 * 24 * 60 * 60 * 1_000;  // 7일 경과 → stale 삭제
+
+// ─── 내부 helper: Retry-After parsing ────────────────────────────────────────
+
+/**
+ * HTTP 429 응답의 Retry-After 헤더 파싱.
+ * delta-seconds (integer) 또는 HTTP-date 양쪽 지원.
+ * 유효하지 않으면 undefined 반환 → 호출부에서 BURST_RETRY_DELAYS fallback.
+ */
+function parseRetryAfter(headerValue: string | null): number | undefined {
+  if (!headerValue) return undefined;
+  const trimmed = headerValue.trim();
+  // Try integer (delta-seconds)
+  const seconds = Number.parseInt(trimmed, 10);
+  if (Number.isFinite(seconds) && seconds >= 0 && String(seconds) === trimmed) {
+    return seconds * 1_000;
+  }
+  // Try HTTP-date
+  const dateMs = Date.parse(trimmed);
+  if (Number.isFinite(dateMs)) {
+    const diff = dateMs - Date.now();
+    return diff > 0 ? diff : 0;
+  }
+  return undefined;
+}
+
+/**
+ * Burst rate limit (HTTP 429) 시 throw 되는 전용 error.
+ * fetchWithRetry 가 retryAfterMs 를 활용해 backoff 결정.
+ */
+class BurstRateError extends Error {
+  readonly retryAfterMs: number | undefined;
+  constructor(message: string, retryAfterMs: number | undefined) {
+    super(message);
+    this.name = 'BurstRateError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
 
 // ─── 응답 인터페이스 ──────────────────────────────────────────────────────────
 
@@ -57,6 +116,7 @@ export class PMatrixHttpClient {
   private readonly agentId: string;
   private readonly retryMax: number;
   private readonly debug: boolean;
+  private readonly localUrl: string | null;
   private lastResubmitAt: number = 0;  // throttle 기준 시각
 
   constructor(config: PMatrixConfig) {
@@ -65,6 +125,7 @@ export class PMatrixHttpClient {
     this.agentId = config.agentId;
     this.retryMax = config.batch.retryMax;
     this.debug = config.debug;
+    this.localUrl = (config as any).localUrl ?? process.env.PMATRIX_LOCAL_URL ?? null;
   }
 
   // ─── 공개 메서드 ────────────────────────────────────────────────────────────
@@ -94,7 +155,7 @@ export class PMatrixHttpClient {
   async getAgentGrade(agentId: string): Promise<GradeResponse> {
     const url = `${this.baseUrl}/v1/agents/${encodeURIComponent(agentId)}/public`;
     const raw = await this.fetchWithRetry('GET', url, null);
-    // TODO(runtime-guard): validate shape at runtime if payload schema drifts
+    assertGradeResponseShape(raw);
     return raw as GradeResponse;
   }
 
@@ -320,16 +381,39 @@ export class PMatrixHttpClient {
    * 단건은 객체, 복수는 배열로 전송.
    */
   private async sendBatchDirect(signals: SignalPayload[]): Promise<BatchSendResponse> {
-    const url = `${this.baseUrl}/v1/inspect/stream`;
     const body = signals.length === 1 ? signals[0] : signals;
+
+    // Try local sidecar first (if available)
+    if (this.localUrl) {
+      try {
+        const localEndpoint = `${this.localUrl}/v1/inspect/local`;
+        const raw = await this.fetchOnce('POST', localEndpoint, body);
+        if (this.debug) {
+          process.stderr.write(`[P-MATRIX] Local sidecar response received\n`);
+        }
+        return (raw as BatchSendResponse | null) ?? { received: signals.length };
+      } catch {
+        // Local sidecar unavailable — fall through to server
+        if (this.debug) {
+          process.stderr.write(`[P-MATRIX] Local sidecar unavailable, falling back to server\n`);
+        }
+      }
+    }
+
+    // Server path (with retries)
+    const url = `${this.baseUrl}/v1/inspect/stream`;
     const raw = await this.fetchWithRetry('POST', url, body);
-    // TODO(runtime-guard): validate shape at runtime if payload schema drifts
     return (raw as BatchSendResponse | null) ?? { received: signals.length };
   }
 
   /**
    * retry 포함 fetch — 최대 retryMax+1회 시도
-   * backoff: 100ms, 500ms, 2,000ms
+   * backoff: 100ms, 500ms, 2,000ms (일반)
+   *
+   * Cross-cutting C: HTTP 429 (BurstRateError) 발생 시 escalating backoff
+   * (Retry-After 헤더 우선, 없으면 BURST_RETRY_DELAYS = [1s, 5s, 30s]).
+   * 429 도 standard retry budget 내에서 재시도, 최종 fail 시 호출자
+   * (sendBatch) 가 backupToLocal 으로 처리.
    */
   private async fetchWithRetry(
     method: string,
@@ -344,11 +428,22 @@ export class PMatrixHttpClient {
       } catch (err) {
         lastError = err as Error;
         if (attempt < this.retryMax) {
-          const delay = RETRY_DELAYS[attempt] ?? 2_000;
-          if (this.debug) {
-            console.debug(
-              `[P-MATRIX] Retry ${attempt + 1}/${this.retryMax} after ${delay}ms: ${lastError.message}`
-            );
+          // Cross-cutting C: 429 BurstRateError 시 escalating backoff
+          let delay: number;
+          if (err instanceof BurstRateError) {
+            delay = err.retryAfterMs ?? BURST_RETRY_DELAYS[attempt] ?? 30_000;
+            if (this.debug) {
+              console.debug(
+                `[P-MATRIX] Burst 429 retry ${attempt + 1}/${this.retryMax} after ${delay}ms (Retry-After ${err.retryAfterMs ?? 'fallback'}): ${lastError.message}`
+              );
+            }
+          } else {
+            delay = RETRY_DELAYS[attempt] ?? 2_000;
+            if (this.debug) {
+              console.debug(
+                `[P-MATRIX] Retry ${attempt + 1}/${this.retryMax} after ${delay}ms: ${lastError.message}`
+              );
+            }
           }
           await sleep(delay);
         }
@@ -361,6 +456,10 @@ export class PMatrixHttpClient {
   /**
    * 단건 fetch (Node.js 22+ 내장 fetch 사용)
    * Authorization: Bearer {apiKey}
+   *
+   * Cross-cutting B (commit 533781f): outgoing X-Request-ID 헤더 송출.
+   * Cross-cutting A: HTTP 5xx 응답 시 body.error.error_id 추출 → stderr 안내.
+   * Cross-cutting C: HTTP 429 응답 시 BurstRateError throw → fetchWithRetry 가 escalating backoff.
    */
   private async fetchOnce(
     method: string,
@@ -370,10 +469,14 @@ export class PMatrixHttpClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    // Cross-cutting B: 매 요청마다 새 X-Request-ID (UUID v4)
+    const requestId = crypto.randomUUID();
+
     try {
       const headers: Record<string, string> = {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
+        'X-Request-ID': requestId,
       };
 
       const response = await fetch(url, {
@@ -383,8 +486,51 @@ export class PMatrixHttpClient {
         signal: controller.signal,
       });
 
+      // Cross-cutting B: response echo trace (PMATRIX_DEBUG_TRACE 시만)
+      if (process.env['PMATRIX_DEBUG_TRACE']) {
+        const echoedReqId = response.headers.get('X-Request-ID') ?? '(none)';
+        process.stderr.write(
+          `[P-MATRIX] trace req_id=${echoedReqId} status=${response.status}\n`
+        );
+      }
+
       if (!response.ok) {
         const text = await response.text().catch(() => '');
+
+        // Cross-cutting C: HTTP 429 → BurstRateError throw with Retry-After
+        if (response.status === 429) {
+          const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'));
+          throw new BurstRateError(
+            `HTTP 429 burst rate exceeded: ${text.slice(0, 200)}`,
+            retryAfterMs
+          );
+        }
+
+        // Cross-cutting A: 5xx 응답 시 error_id 추출 (server Production Polish A error UX 정합)
+        if (response.status >= 500) {
+          let errorId: string | undefined;
+          let serverRequestId: string | undefined;
+          try {
+            const parsed = JSON.parse(text) as Record<string, unknown>;
+            const errorBody = parsed['error'] as Record<string, unknown> | undefined;
+            if (errorBody) {
+              errorId = errorBody['error_id'] as string | undefined;
+              serverRequestId = errorBody['request_id'] as string | undefined;
+            }
+          } catch {
+            // body 가 JSON 아니거나 schema 다름 — header echo 로 fallback
+          }
+          // fallback: response header
+          errorId = errorId ?? response.headers.get('X-Error-ID') ?? undefined;
+          serverRequestId = serverRequestId ?? response.headers.get('X-Request-ID') ?? undefined;
+
+          const eid = errorId ?? '(none)';
+          const rid = serverRequestId ?? '(none)';
+          process.stderr.write(
+            `[P-MATRIX] Error ${response.status}: error_id=${eid} request_id=${rid} — Support 문의 시 Error ID 함께 제공해 주세요.\n`
+          );
+        }
+
         throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
       }
 

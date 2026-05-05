@@ -64,22 +64,31 @@ function makeSignal(): SignalPayload {
   };
 }
 
+/** Minimal Headers-like mock — Cross-cutting A/B/C 도입 후 fetchOnce 가 response.headers.get() 호출 */
+function makeHeadersMock(map: Record<string, string> = {}) {
+  return {
+    get: jest.fn((name: string) => map[name.toLowerCase()] ?? null),
+  };
+}
+
 /** HTTP 200 OK fetch 모킹 — bun-types 호환을 위해 반환 타입 생략 */
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-function mockFetchOk(body: unknown) {
+function mockFetchOk(body: unknown, headers: Record<string, string> = {}) {
   return jest.fn().mockResolvedValue({
     ok: true,
     status: 200,
+    headers: makeHeadersMock(headers),
     text: jest.fn().mockResolvedValue(JSON.stringify(body)),
   } as unknown as Response);
 }
 
 /** HTTP 에러 fetch 모킹 — bun-types 호환을 위해 반환 타입 생략 */
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-function mockFetchFail(status = 500, text = 'Internal Server Error') {
+function mockFetchFail(status = 500, text = 'Internal Server Error', headers: Record<string, string> = {}) {
   return jest.fn().mockResolvedValue({
     ok: false,
     status,
+    headers: makeHeadersMock(headers),
     text: jest.fn().mockResolvedValue(text),
   } as unknown as Response);
 }
@@ -99,14 +108,14 @@ describe('extractRtFromResponse — 완전/부분 응답 처리', () => {
       received: 1,
       risk: 0.25,
       grade: 'B',
-      mode: 'A+0',
+      mode: 'caution',
       axes: { baseline: 0.9, norm: 0.8, stability: 0.1, meta_control: 0.95 },
     };
     const result = PMatrixHttpClient.extractRtFromResponse(res);
     expect(result).not.toBeNull();
     expect(result!.rt).toBe(0.25);
     expect(result!.grade).toBe('B');
-    expect(result!.mode).toBe('A+0');
+    expect(result!.mode).toBe('caution');
     expect(result!.axes.baseline).toBe(0.9);
     expect(result!.axes.meta_control).toBe(0.95);
   });
@@ -115,7 +124,7 @@ describe('extractRtFromResponse — 완전/부분 응답 처리', () => {
     const res: BatchSendResponse = {
       received: 1,
       grade: 'B',
-      mode: 'A+0',
+      mode: 'caution',
       axes: { baseline: 0.9, norm: 0.8, stability: 0.1, meta_control: 0.95 },
     };
     expect(PMatrixHttpClient.extractRtFromResponse(res)).toBeNull();
@@ -125,7 +134,7 @@ describe('extractRtFromResponse — 완전/부분 응답 처리', () => {
     const res: BatchSendResponse = {
       received: 1,
       risk: 0.25,
-      mode: 'A+0',
+      mode: 'caution',
       axes: { baseline: 0.9, norm: 0.8, stability: 0.1, meta_control: 0.95 },
     };
     expect(PMatrixHttpClient.extractRtFromResponse(res)).toBeNull();
@@ -142,7 +151,7 @@ describe('extractRtFromResponse — 완전/부분 응답 처리', () => {
   });
 
   test('axes 없음 → null', () => {
-    const res: BatchSendResponse = { received: 1, risk: 0.25, grade: 'B', mode: 'A+0' };
+    const res: BatchSendResponse = { received: 1, risk: 0.25, grade: 'B', mode: 'caution' };
     expect(PMatrixHttpClient.extractRtFromResponse(res)).toBeNull();
   });
 
@@ -163,7 +172,7 @@ describe('healthCheck — fail-open 설계', () => {
     grade: 'B' as const,
     p_score: 80,
     risk: 0.20,
-    mode: 'A+0' as const,
+    mode: 'caution' as const,
     axes: { baseline: 0.9, norm: 0.8, stability: 0.1, meta_control: 0.95 },
     last_updated: new Date().toISOString(),
   };

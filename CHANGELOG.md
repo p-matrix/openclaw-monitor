@@ -4,6 +4,61 @@ All notable changes to `@pmatrix/openclaw-monitor` will be documented in this fi
 
 ---
 
+## [0.6.0] — 2026-04-27
+
+### Added (Cross-cutting client 보강 — server Production Polish 정합)
+
+- **Cross-cutting A — Error correlation logging**: HTTP 5xx 응답 body 의
+  `error_id` 추출 (header `X-Error-ID` fallback) → stderr 안내 메시지
+  ("Support 문의 시 Error ID 함께 제공해 주세요"). server Production
+  Polish A error UX (commit `08a27e3`) 정합.
+- **Cross-cutting B — X-Request-ID 헤더**: outgoing request 마다
+  `crypto.randomUUID()` 송출 + response echo trace
+  (`PMATRIX_DEBUG_TRACE=1` 시만 stderr). server middleware
+  (commit `533781f` `app/middleware/request_id.py`) 정합.
+- **Cross-cutting C — Burst 429 handling**: HTTP 429 응답 시 신규
+  `BurstRateError` throw → `fetchWithRetry` 가 `Retry-After` 헤더 우선
+  + escalating backoff (`BURST_RETRY_DELAYS = [1s, 5s, 30s]`). 일반
+  retry budget 내에서 재시도, 최종 fail 시 기존 `backupToLocal` 경로.
+  server `app/middleware/burst_rate_limit.py` (`BURST_RATE_PER_SEC=20`,
+  Redis ZSET sliding window) 정합.
+
+### Notes
+
+- Spec public contract 변경 없음 — outgoing 헤더 + stderr 로깅 + 재시도
+  schedule 만 추가.
+- 기존 18 test suite (cost-tracker, safety-gate, credential-scanner,
+  drift, autonomy 등) 그대로 유지. cross-cutting 동작은 잠재적 별도
+  test 추가 가능 (현 사이클은 plugin test 0건 추가, regression 의존).
+
+---
+
+## [0.5.0] — 2026-04-27
+
+### Changed (BREAKING — Mode literal rename)
+
+- **Phase R-5 Mode naming Gen1 → Gen2 names** (server-side parity per Spec §❷):
+  `'A+1'` → `'normal'` / `'A+0'` → `'caution'` / `'A-1'` → `'alert'` /
+  `'A-2'` → `'critical'` / `'A-0'` → `'halt'`
+- **Affected APIs**: `SafetyMode` union type (`src/types.ts`), `rtToMode()`
+  return values + Safety Gate matrix mode comparisons (`src/safety-gate.ts`),
+  session-state defaults, UI formatter mode display (`src/ui/formatter.ts`),
+  4 test fixture files (37 occurrences)
+- **Migration**: consumers must update mode string comparisons
+  (`mode === 'A-0'` → `mode === 'halt'` 등). Server protocol output 도
+  Gen2 names 로 통합 (Backend Spec v1.53)
+
+### Fixed (Phase R-6 SDK build hygiene)
+
+- **breach-support.ts**: `getApprovalStatus()` 의 `noUncheckedIndexedAccess`
+  TypeScript narrowing 부재 → `Object is possibly 'undefined'` 3건 fix
+  (explicit local const + null check pattern). 18 test suites + 493 tests
+  PASS (이전 13 suites compile failed)
+- **field-node-runtime dependency**: `node_modules/@pmatrix/field-node-runtime`
+  symlink 정합 (`npm install` 로 npm registry 0.2.0 정상 fetch)
+
+---
+
 ## [0.4.0] — 2026-03-15
 
 ### Added

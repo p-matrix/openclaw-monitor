@@ -19,6 +19,7 @@ import {
   PendingLink,
   TurnSnapshot,
 } from './types';
+import { BreachSupport } from './breach-support';
 
 // ─── 전역 세션 맵 ─────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ export function createSession(
 
     // 초기 R(t) = 0.0 (캐시 없음, fail-open §7-1)
     currentRt: 0.0,
-    currentMode: 'A+1',
+    currentMode: 'normal',
     axes: makeDefaultAxes(),
     grade: null,
     pScore: null,
@@ -159,6 +160,9 @@ export function createSession(
     // cost_usd 계산 없음 — 서버 pricing.py 담당
     totalInputTokens: 0,
     totalOutputTokens: 0,
+
+    // ── Breach Taxonomy 지원 ──────────────────────────────────────────────────
+    breachSupport: new BreachSupport(agentId),
   };
 
   sessions.set(sessionKey, state);
@@ -846,9 +850,9 @@ function clamp01(v: number): number {
  * R(t) → SafetyMode (safety-gate.ts와 동일 로직, 순환 임포트 방지를 위해 인라인)
  */
 function rtToModeLocal(rt: number): SafetyMode {
-  if (rt < 0.15) return 'A+1';
-  if (rt < 0.30) return 'A+0';
-  if (rt < 0.50) return 'A-1';
-  if (rt < 0.75) return 'A-2';
-  return 'A-0';
+  if (rt < 0.15) return 'normal';
+  if (rt < 0.30) return 'caution';
+  if (rt < 0.50) return 'alert';
+  if (rt < 0.75) return 'critical';
+  return 'halt';
 }

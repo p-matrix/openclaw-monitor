@@ -19,11 +19,11 @@ import { ToolRiskTier, GateAction, SafetyMode } from './types';
  * Plugin은 반드시 Server 기준 사용.
  */
 export const MODE_BOUNDARIES: Readonly<Record<SafetyMode, readonly [number, number]>> = {
-  'A+1': [0.00, 0.15],  // Normal
-  'A+0': [0.15, 0.30],  // Caution
-  'A-1': [0.30, 0.50],  // Alert
-  'A-2': [0.50, 0.75],  // Critical
-  'A-0': [0.75, 1.00],  // Halt
+  'normal': [0.00, 0.15],  // Normal
+  'caution': [0.15, 0.30],  // Caution
+  'alert': [0.30, 0.50],  // Alert
+  'critical': [0.50, 0.75],  // Critical
+  'halt': [0.75, 1.00],  // Halt
 } as const;
 
 /**
@@ -31,11 +31,11 @@ export const MODE_BOUNDARIES: Readonly<Record<SafetyMode, readonly [number, numb
  * @param rt 위험도 [0, 1]
  */
 export function rtToMode(rt: number): SafetyMode {
-  if (rt < 0.15) return 'A+1';
-  if (rt < 0.30) return 'A+0';
-  if (rt < 0.50) return 'A-1';
-  if (rt < 0.75) return 'A-2';
-  return 'A-0';
+  if (rt < 0.15) return 'normal';
+  if (rt < 0.30) return 'caution';
+  if (rt < 0.50) return 'alert';
+  if (rt < 0.75) return 'critical';
+  return 'halt';
 }
 
 // ─── Tool Risk Tier 분류 (§3-1) ───────────────────────────────────────────────
@@ -148,7 +148,7 @@ export function evaluateSafetyGate(
   const rtStr = rt.toFixed(2);
 
   // Halt (≥0.75) → 모두 차단 (§14-2: 반드시 block:true, throw 금지)
-  if (mode === 'A-0') {
+  if (mode === 'halt') {
     return {
       action: 'BLOCK',
       reason: `Halt 상태 (R(t) ${rtStr} ≥ 0.75) — 모든 도구 차단`,
@@ -156,7 +156,7 @@ export function evaluateSafetyGate(
   }
 
   // Critical (0.50~0.75)
-  if (mode === 'A-2') {
+  if (mode === 'critical') {
     if (toolRisk === 'HIGH') {
       return {
         action: 'BLOCK',
@@ -173,7 +173,7 @@ export function evaluateSafetyGate(
   }
 
   // Alert (0.30~0.50) [A-1]
-  if (mode === 'A-1') {
+  if (mode === 'alert') {
     if (toolRisk === 'HIGH') {
       return {
         action: 'CONFIRM',
@@ -184,7 +184,7 @@ export function evaluateSafetyGate(
   }
 
   // Caution (0.15~0.30) [A-1 근거: HIGH=CONFIRM, 자동허용 아님]
-  if (mode === 'A+0') {
+  if (mode === 'caution') {
     if (toolRisk === 'HIGH') {
       return {
         action: 'CONFIRM',

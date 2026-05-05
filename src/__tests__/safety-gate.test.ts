@@ -26,28 +26,28 @@ import {
 describe('rtToMode — 5-Mode 경계값 (Server constants.py 기준)', () => {
 
   // Normal (A+1): [0.00, 0.15)
-  test('0.00 → A+1 (Normal 최솟값)', () => expect(rtToMode(0.00)).toBe('A+1'));
-  test('0.14 → A+1 (Normal 최댓값 직전)', () => expect(rtToMode(0.14)).toBe('A+1'));
+  test('0.00 → A+1 (Normal 최솟값)', () => expect(rtToMode(0.00)).toBe('normal'));
+  test('0.14 → A+1 (Normal 최댓값 직전)', () => expect(rtToMode(0.14)).toBe('normal'));
 
   // Caution (A+0): [0.15, 0.30)
-  test('0.15 → A+0 (Caution 시작)', () => expect(rtToMode(0.15)).toBe('A+0'));
-  test('0.20 → A+0 (Caution 중간)', () => expect(rtToMode(0.20)).toBe('A+0'));
-  test('0.29 → A+0 (Caution 최댓값 직전)', () => expect(rtToMode(0.29)).toBe('A+0'));
+  test('0.15 → A+0 (Caution 시작)', () => expect(rtToMode(0.15)).toBe('caution'));
+  test('0.20 → A+0 (Caution 중간)', () => expect(rtToMode(0.20)).toBe('caution'));
+  test('0.29 → A+0 (Caution 최댓값 직전)', () => expect(rtToMode(0.29)).toBe('caution'));
 
   // Alert (A-1): [0.30, 0.50)
-  test('0.30 → A-1 (Alert 시작)', () => expect(rtToMode(0.30)).toBe('A-1'));
-  test('0.40 → A-1 (Alert 중간)', () => expect(rtToMode(0.40)).toBe('A-1'));
-  test('0.49 → A-1 (Alert 최댓값 직전)', () => expect(rtToMode(0.49)).toBe('A-1'));
+  test('0.30 → A-1 (Alert 시작)', () => expect(rtToMode(0.30)).toBe('alert'));
+  test('0.40 → A-1 (Alert 중간)', () => expect(rtToMode(0.40)).toBe('alert'));
+  test('0.49 → A-1 (Alert 최댓값 직전)', () => expect(rtToMode(0.49)).toBe('alert'));
 
   // Critical (A-2): [0.50, 0.75)
-  test('0.50 → A-2 (Critical 시작)', () => expect(rtToMode(0.50)).toBe('A-2'));
-  test('0.60 → A-2 (Critical 중간)', () => expect(rtToMode(0.60)).toBe('A-2'));
-  test('0.74 → A-2 (Critical 최댓값 직전)', () => expect(rtToMode(0.74)).toBe('A-2'));
+  test('0.50 → A-2 (Critical 시작)', () => expect(rtToMode(0.50)).toBe('critical'));
+  test('0.60 → A-2 (Critical 중간)', () => expect(rtToMode(0.60)).toBe('critical'));
+  test('0.74 → A-2 (Critical 최댓값 직전)', () => expect(rtToMode(0.74)).toBe('critical'));
 
   // Halt (A-0): [0.75, 1.00]
-  test('0.75 → A-0 (Halt 시작)', () => expect(rtToMode(0.75)).toBe('A-0'));
-  test('0.90 → A-0 (Halt 중간)', () => expect(rtToMode(0.90)).toBe('A-0'));
-  test('1.00 → A-0 (최대값)', () => expect(rtToMode(1.00)).toBe('A-0'));
+  test('0.75 → A-0 (Halt 시작)', () => expect(rtToMode(0.75)).toBe('halt'));
+  test('0.90 → A-0 (Halt 중간)', () => expect(rtToMode(0.90)).toBe('halt'));
+  test('1.00 → A-0 (최대값)', () => expect(rtToMode(1.00)).toBe('halt'));
 
 });
 

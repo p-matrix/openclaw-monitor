@@ -142,6 +142,9 @@ function registerBeforeToolCall(
         incrementDangerEvents(sessionKey);
         incrementSafetyGateBlocks(sessionKey);
 
+        // Breach Taxonomy: record blocked action
+        state.breachSupport?.recordBlockedAction(toolName, mcBlock.reason);
+
         const msg = formatMetaControlBlock(toolName, mcBlock.reason, mcBlock.metaControlDelta);
         api.logger.warn(msg);
 
@@ -204,6 +207,9 @@ function registerBeforeToolCall(
           });
         }
 
+        // Breach Taxonomy: record blocked action
+        state.breachSupport?.recordBlockedAction(toolName, gateResult.reason);
+
         const paramsSummary = summarizeParams(params);
         const msg = formatGateBlock(toolName, paramsSummary, rt, mode, gateResult.reason);
         api.logger.warn(msg);
@@ -212,6 +218,22 @@ function registerBeforeToolCall(
       }
 
       if (gateResult.action === 'CONFIRM') {
+        // Breach Taxonomy: emit approval_requested signal
+        const approvalId = `${sessionKey}:${callId}`;
+        state.breachSupport?.recordApprovalRequested(approvalId, toolName);
+        if (config.dataSharing) {
+          const reqSignal = buildSignalPayload(state, {
+            event_type: 'approval_requested',
+            tool_name: toolName,
+            priority: 'critical',
+          });
+          void client.sendCritical(reqSignal).catch((err: Error) => {
+            if (config.debug) {
+              api.logger.debug(`[P-MATRIX] sendCritical failed: ${err.message}`);
+            }
+          });
+        }
+
         const confirmResult = await requestUserConfirmation(
           sessionKey,
           toolName,
@@ -227,6 +249,10 @@ function registerBeforeToolCall(
           pendingToolCalls.delete(callId);
           incrementSafetyGateBlocks(sessionKey);
           incrementDangerEvents(sessionKey);
+
+          // Breach Taxonomy: record approval denied + blocked action
+          state.breachSupport?.recordApprovalDenied(approvalId);
+          state.breachSupport?.recordBlockedAction(toolName, confirmResult === 'timeout' ? 'confirm_timeout' : 'user_denied');
 
           // gate_denied / gate_timeout 긴급 신호 전송
           const eventType = confirmResult === 'timeout' ? 'gate_timeout' : 'gate_denied';
@@ -245,6 +271,18 @@ function registerBeforeToolCall(
                 }
               });
             }
+
+            // Breach Taxonomy: approval_denied signal
+            const deniedSignal = buildSignalPayload(state, {
+              event_type: 'approval_denied',
+              tool_name: toolName,
+              priority: 'critical',
+            });
+            void client.sendCritical(deniedSignal).catch((err: Error) => {
+              if (config.debug) {
+                api.logger.debug(`[P-MATRIX] sendCritical failed: ${err.message}`);
+              }
+            });
           }
 
           const blockReason = confirmResult === 'timeout'
@@ -252,6 +290,9 @@ function registerBeforeToolCall(
             : '사용자 거부 — 차단됨 (fail-closed)';
           return { block: true, blockReason };
         }
+
+        // Breach Taxonomy: record approval granted
+        state.breachSupport?.recordApprovalGranted(approvalId);
 
         // 사용자가 허용 → gate_override 이벤트 전송 (§12-4 A-5)
         if (config.dataSharing) {
@@ -262,6 +303,18 @@ function registerBeforeToolCall(
             mode_at_override: mode,
           });
           bufferSignal(sessionKey, signal);
+
+          // Breach Taxonomy: approval_granted signal
+          const grantedSignal = buildSignalPayload(state, {
+            event_type: 'approval_granted',
+            tool_name: toolName,
+            priority: 'critical',
+          });
+          void client.sendCritical(grantedSignal).catch((err: Error) => {
+            if (config.debug) {
+              api.logger.debug(`[P-MATRIX] sendCritical failed: ${err.message}`);
+            }
+          });
         }
       }
 
@@ -385,13 +438,32 @@ function bufferNormSignal(
   toolName: string,
   config: PMatrixConfig
 ): void {
-  if (!config.dataSharing) return;
   const state = getSession(sessionKey);
   if (!state) return;
+
+  // Breach Taxonomy: increment tool call count
+  state.breachSupport?.incrementToolCalls();
+
+  if (!config.dataSharing) return;
+
+  // Breach Taxonomy: enrich metadata with scope + blocked action history
+  const breachMeta: Record<string, unknown> = {};
+  if (state.breachSupport) {
+    breachMeta.in_scope = state.breachSupport.isInScope('AP-1');
+    const recentBlocked = state.breachSupport.getRecentBlocked();
+    if (recentBlocked.length > 0) {
+      breachMeta.blocked_action_history = recentBlocked.map(b => ({
+        tool: b.tool_name,
+        ts: b.timestamp,
+        reason: b.reason,
+      }));
+    }
+  }
 
   const signal = buildSignalPayload(state, {
     event_type: 'tool_call',
     tool_name: toolName,
+    ...breachMeta,
   });
   bufferSignal(sessionKey, signal);
 }
