@@ -1,0 +1,134 @@
+#
+# P-MATRIX Monitor SDK — Release Tag Automation (B-1, Gen4-α ops backlog)
+#
+# Trigger: git tag matching `v*.*.*` push to main → auto-create GitHub release.
+# Goal: npm registry ↔ GitHub release tag cross-channel drift 영구 봉인.
+#
+# Strategic dispatch decision (2026-05-15, architect approval pre-wedge):
+#   - B-1 = Hermes M4 publish 시점 동시 진행 = first applied instance
+#   - Wedge-agnostic ops infra (3 active feedback policies §payment/cost: cost 0)
+#   - 6 SDK 전수 적용 (codex / claude-code / cursor / gemini-cli / openclaw / hermes)
+#
+# References:
+#   - MEMORY anchor: gen4_alpha_ops_backlog.md B-1
+#   - Strategic dispatch v7 (B-1 + M4 sequence) 2026-05-15
+#   - lesson_cross_channel_verify_axis (5-axis Step 0, Trigger A first resolution)
+#
+# Architect approval gate (T3):
+#   - npm publish 는 별도 architect manual (NPM_TOKEN 영역)
+#   - git tag push 시점에 본 workflow 자동 trigger → architect 가 tag 만들면 release 자동
+#
+name: Release Tag Automation (B-1)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'         # semver tag (e.g., v0.1.0, v1.0.0)
+      - 'v*.*.*-*'       # prerelease (e.g., v1.0.0-rc1)
+
+permissions:
+  contents: write        # required for gh release create
+
+concurrency:
+  group: release-tag-${{ github.ref }}
+  cancel-in-progress: false   # do NOT cancel in-flight release
+
+jobs:
+  create-release:
+    name: Create GitHub Release from tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout (full history for release notes)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for `gh release create --generate-notes`
+
+      - name: Extract tag metadata
+        id: tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          # Detect prerelease (semver -* suffix)
+          if echo "$VERSION" | grep -q '-'; then
+            PRERELEASE="true"
+          else
+            PRERELEASE="false"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package.json version matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) != tag version ($TAG_VERSION)"
+            echo "::error::Tag must match the published npm version exactly."
+            exit 1
+          fi
+          echo "::notice::package.json version $PKG_VERSION == tag $TAG_VERSION ✓"
+
+      - name: Verify npm registry version published
+        id: npm_check
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          # Query npm registry (best-effort, npm publish may lag by seconds)
+          MAX_ATTEMPTS=6
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            if npm view "$PKG_NAME@$TAG_VERSION" version 2>/dev/null | grep -q "$TAG_VERSION"; then
+              echo "::notice::npm registry has $PKG_NAME@$TAG_VERSION ✓"
+              echo "npm_verified=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Attempt $i/$MAX_ATTEMPTS: $PKG_NAME@$TAG_VERSION not yet on npm, waiting 10s..."
+            sleep 10
+          done
+          # Best-effort fallback: warn but do not block release (npm publish may
+          # follow tag push; release tag preserves cross-channel record)
+          echo "::warning::npm registry does not yet have $PKG_NAME@$TAG_VERSION after ${MAX_ATTEMPTS}x10s"
+          echo "::warning::Release will be created; verify npm publish completion separately."
+          echo "npm_verified=false" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          PRERELEASE="${{ steps.tag.outputs.prerelease }}"
+          PRERELEASE_FLAG=""
+          if [ "$PRERELEASE" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          # Idempotency: skip if release already exists for this tag
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists, skipping create"
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            $PRERELEASE_FLAG
+          echo "::notice::Created GitHub release $TAG"
+
+      - name: Render summary
+        if: always()
+        env:
+          NPM_VERIFIED: ${{ steps.npm_check.outputs.npm_verified }}
+        run: |
+          {
+            echo "# Release Tag Automation — ${{ steps.tag.outputs.tag }}"
+            echo ""
+            echo "- Tag: \`${{ steps.tag.outputs.tag }}\`"
+            echo "- Version: \`${{ steps.tag.outputs.version }}\`"
+            echo "- Prerelease: ${{ steps.tag.outputs.prerelease }}"
+            echo "- npm registry verified: ${NPM_VERIFIED:-unknown}"
+            echo ""
+            echo "## Cross-channel sync"
+            echo "- Codebase commit: ${{ github.sha }}"
+            echo "- npm registry: \`$(node -p "require('./package.json').name")@${{ steps.tag.outputs.version }}\`"
+            echo "- GitHub release: \`${{ steps.tag.outputs.tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
