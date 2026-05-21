@@ -1,6 +1,6 @@
 {
   "name": "@pmatrix/openclaw-monitor",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "P-MATRIX runtime governance monitor for OpenClaw — Safety Gate, Kill Switch, Live Grade",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,14 +37,15 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@pmatrix/core-sdk": "^0.1.0",
     "@pmatrix/field-node-runtime": "^0.2.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.4.0",
-    "jest": "^29.0.0",
     "@types/jest": "^29.0.0",
-    "ts-jest": "^29.0.0"
+    "@types/node": "^22.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.4.0"
   },
   "keywords": [
     "openclaw",
@@ -78,5 +79,14 @@
     "testMatch": [
       "**/__tests__/**/*.test.ts"
     ]
+  },
+  "signing": {
+    "method": "sigstore-cosign",
+    "version": 1,
+    "identity_pattern": "https://github.com/p-matrix/pmatrix-platform/.github/workflows/plugin-sign.yml.*",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "verify_command": "bash server/scripts/verify_plugin.sh --pkg <name> --version <semver> --tgz <pkg>.tgz --sig <pkg>.sig --crt <pkg>.crt",
+    "status": "skeleton-v0",
+    "doc": "docs/active/security/PLUGIN_SIGNING.md"
   }
 }

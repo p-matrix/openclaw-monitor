@@ -4,6 +4,27 @@ All notable changes to `@pmatrix/openclaw-monitor` will be documented in this fi
 
 ---
 
+## [0.6.1] — 2026-05-21
+
+### Changed
+
+- **Migrate to `@pmatrix/core-sdk@^0.1.0`** — `PMatrixHttpClient` 와 공통 schema (5-layer Agent Host-Integration Adapter Contract v0.1)를 `@pmatrix/core-sdk` 로 위임. SDK 자체 substance 큰 폭 감소, API surface 변경 0 (consumer 영향 없음).
+
+### Note (A19-2 partial application — honesty disclosure)
+
+- A19-2 (credential-scanner core-sdk extract)는 **부분 적용**. openclaw는 자체 `src/credential-scanner.ts`를 보존 (vendor-specific surface divergence). Cross-SDK 일관성보다 openclaw vendor-specific behavior 우선. 차후 cycle에서 재평가 영역.
+
+### Verification
+
+- Fresh install: `node_modules/@pmatrix/core-sdk` 가 registry tarball 추출 confirmed (symlink=false / version=0.1.0)
+- Tests: 507 PASS, regression 0 (R-X.4 lockstep verify, monorepo commit `d1a6d08`)
+
+### Lockstep §6.3 v0.2
+
+- `@pmatrix/core-sdk` 의존성을 caret range `^0.1.0` 으로 declared. Core SDK major bump 시 6 adapter SDK 동시 major bump 의무.
+
+---
+
 ## [0.6.0] — 2026-04-27
 
 ### Added (Cross-cutting client 보강 — server Production Polish 정합)

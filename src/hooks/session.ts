@@ -237,6 +237,7 @@ function registerSessionEnd(
     // 2b. 세션 요약 전송 (dataSharing 동의 후에만)
     if (state && config.dataSharing) {
       await client.sendSessionSummary({
+        // R-X.3 migration: signal_source + framework flow via AdapterIdentity
         sessionId: sessionKey,
         agentId: state.agentId,
         totalTurns: state.turnNumber,
@@ -244,8 +245,6 @@ function registerSessionEnd(
         credentialBlocks: state.credentialBlocks,
         safetyGateBlocks: state.safetyGateBlocks,
         endReason: event['reason'] as string | undefined,
-        signal_source: 'adapter_stream',
-        framework: 'openclaw',
         framework_tag: config.frameworkTag ?? 'stable',
       });
     }

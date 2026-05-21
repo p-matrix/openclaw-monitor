@@ -158,36 +158,26 @@ export interface HookResult {
 
 // ─── 5-Mode 및 Grade ──────────────────────────────────────────────────────────
 
-/** P-MATRIX 5-Mode (Server constants.py 경계값 기준) */
-export type SafetyMode = 'normal' | 'caution' | 'alert' | 'critical' | 'halt';
+// ─── Re-export shared types from @pmatrix/core-sdk (R-X.3 migration) ──────
 
-/** Trust Grade */
-export type TrustGrade = 'A' | 'B' | 'C' | 'D' | 'E';
+import type {
+  SafetyMode,
+  TrustGrade,
+  ToolRiskTier,
+  GateAction,
+  AxesState,
+  HealthCheckResult,
+  SignalPayload as CoreSignalPayload,
+} from '@pmatrix/core-sdk';
 
-/** Tool 위험 등급 */
-export type ToolRiskTier = 'HIGH' | 'MEDIUM' | 'LOW';
-
-/** Safety Gate 판정 결과 */
-export type GateAction = 'ALLOW' | 'BLOCK' | 'CONFIRM';
-
-// ─── 4축 상태 ─────────────────────────────────────────────────────────────────
-//
-// Stability axis polarity convention:
-//   Monitor sends "instability" — higher value = more unstable (0=safe, 1.0=HALT).
-//   Server inverts stability for R(t) computation.
-//   Same field name, opposite semantic at producer vs consumer.
-//
-
-export interface AxesState {
-  /** BASELINE: 초기 설정 무결성 — 높을수록 안전 */
-  baseline: number;
-  /** NORM: 행동 정상 범위 — 높을수록 안전 */
-  norm: number;
-  /** STABILITY: instability score — 높을수록 위험. Server inverts via (1-stability). */
-  stability: number;
-  /** META_CONTROL: 자기 통제력 — 높을수록 안전 */
-  meta_control: number;
-}
+export type {
+  SafetyMode,
+  TrustGrade,
+  ToolRiskTier,
+  GateAction,
+  AxesState,
+  HealthCheckResult,
+};
 
 // ─── BreachSupport 인스턴스 인터페이스 (순환 import 방지용) ─────────────────────
 
@@ -372,23 +362,16 @@ export interface SessionState {
 // ─── 신호 페이로드 ────────────────────────────────────────────────────────────
 
 /**
- * POST /v1/inspect/stream 페이로드
+ * POST /v1/inspect/stream 페이로드 — OpenClaw 변형
  * DB 저장값 계약 (§6-5): signal_source="adapter_stream", framework="openclaw"
+ * (OpenClaw는 다른 5 SDK와 달리 '*_hook' 패턴이 아닌 'adapter_stream' 사용)
+ *
+ * R-X.3 migration: extends core-sdk's generic SignalPayload, narrows
+ * vendor branding to OpenClaw literals.
  */
-export interface SignalPayload {
-  agent_id: string;
-  baseline: number;
-  norm: number;
-  stability: number;
-  meta_control: number;
-  timestamp: string;
+export interface SignalPayload extends Omit<CoreSignalPayload, 'signal_source' | 'framework'> {
   signal_source: 'adapter_stream';
   framework: 'openclaw';
-  framework_tag: 'beta' | 'stable';
-  /** ★ Tier-2 신규: 스키마 버전 고정 (Tier-0/1 미포함 이벤트 → 서버 "0.2" fallback) */
-  schema_version: '0.3';
-  metadata: SignalMetadata;
-  state_vector: null;
 }
 
 export interface SignalMetadata {
